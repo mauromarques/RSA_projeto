@@ -42,7 +42,7 @@ def generateLocationEvaluation():
     # Replace for evaluation model message
     with open('sensors_evaluation.json', 'r') as f:
         m = json.load(f)
-    m["stationID"] = 2
+    m["stationID"] = 3
     m["latitude"] = 0
     m["longitude"] = 0
     for client in clients:
