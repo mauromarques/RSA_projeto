@@ -17,7 +17,9 @@ def on_message(client, userdata, msg):
     # Process the received message if needed...
 
 def generateCam():
-    with open('gps_coordinates.txt', 'r') as file:
+    obuNum = str(int(int(listening_ip)/10))
+    txtFileName = "gps_obu" + obuNum + ".txt"
+    with open(txtFileName, 'r') as file:
         try:
             position = int(open('position.txt').read())
         except FileNotFoundError:

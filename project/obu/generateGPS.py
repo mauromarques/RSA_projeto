@@ -37,28 +37,33 @@ def generate_random_walk_coordinates(num_steps, grid_dimension):
     return x_positions, y_positions
 
 # Check if the correct number of command-line arguments is provided
-if len(sys.argv) != 3:
-    print("Usage: python generate_gps.py <num_steps> <grid_dimension>")
+if len(sys.argv) != 4:
+    print("Usage: python generate_gps.py <num_steps> <grid_dimension> <num_files>")
     sys.exit(1)
 
 try:
     num_steps = int(sys.argv[1])
     grid_dimension = int(sys.argv[2])
+    num_files = int(sys.argv[3])
 except ValueError:
-    print("Number of steps and grid dimension must be integers.")
+    print("Number of steps, grid dimension, and number of files must be integers.")
     sys.exit(1)
 
-# Check if the file already exists and delete it
-if os.path.exists('gps_coordinates.txt'):
-    os.remove('gps_coordinates.txt')
-    print("Existing file gps_coordinates.txt deleted.")
+# Generate coordinates for each file and save them
+for i in range(2, 2 + num_files):
+    filename = f'gps_obu{i}.txt'
+    
+    # Check if the file already exists and delete it
+    if os.path.exists(filename):
+        os.remove(filename)
+        print(f"Existing file {filename} deleted.")
+    
+    # Generate coordinates
+    x_positions, y_positions = generate_random_walk_coordinates(num_steps, grid_dimension)
+    
+    # Write coordinates to the text file
+    with open(filename, 'w') as file:
+        for x, y in zip(x_positions, y_positions):
+            file.write(f"{x},{y}\n")
 
-# Generate coordinates
-x_positions, y_positions = generate_random_walk_coordinates(num_steps, grid_dimension)
-
-# Write coordinates to a text file
-with open('gps_coordinates.txt', 'w') as file:
-    for x, y in zip(x_positions, y_positions):
-        file.write(f"{x},{y}\n")
-
-print(f"{num_steps} coordinates generated following a random walk on a {grid_dimension}x{grid_dimension} grid, and saved to gps_coordinates.txt.")
+    print(f"{num_steps} coordinates generated following a random walk on a {grid_dimension}x{grid_dimension} grid, and saved to {filename}.")
