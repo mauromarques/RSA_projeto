@@ -18,9 +18,7 @@ done
 # Launch each application in a new gnome-terminal tab
 for ((i = 0; i < num_apps; i++)); do
   self_id=${identifiers[i]}
-  other_ids=("${identifiers[@]}")
-  unset 'other_ids[i]'
-  params=("$self_id" "${other_ids[@]}")
+  params=("$self_id")
 
   gnome-terminal --tab -- bash -c "python3 obu.py ${params[*]}; exec bash"
 done

@@ -1,9 +1,15 @@
 #!/bin/bash
 
+# Check if the number of applications to launch is provided
+if [ -z "$1" ]; then
+  echo "Usage: $0 <number_of_obus>"
+  exit 1
+fi
+
 # Define variables
-OBU_TO_OBSERVE=2
+OBU_TO_OBSERVE=20
 NUM_SAMPLES=500
-NUM_OBUS=2
+NUM_OBUS=$1
 GRID_DIMENSION=50
 SENSOR_MAX_VALUE=100
 SENSOR_VARIATION_RANGE=2
@@ -20,7 +26,7 @@ echo "------------------------------------"
 
 # Execute generateHeatMap.py script
 echo "Executing generateHeatMap.py..."
-python3 generateHeatMap.py sensor_data.txt gps_obu$OBU_TO_OBSERVE.txt
+python3 generateHeatMap.py sensor_data.txt $OBU_TO_OBSERVE
 echo "------------------------------------"
 
 echo "All scripts executed."
