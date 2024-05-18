@@ -1,4 +1,5 @@
 {
     "stationID": 1,
-    "stationType": 15
+    "stationType": 15,
+    "values": 1
 }

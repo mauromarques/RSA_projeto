@@ -25,7 +25,7 @@ def on_message(client, userdata, msg):
         lon = obj.get("longitude")
         print("Update location for OBU " + str(stationID))
         if int(listening_ip) == int(stationID):
-            selfCoordinates = (lat, lon)
+            selfCoordinates = (lon, lat)
         else:
             # Flag to check if stationID exists in otherCoordinates
             exists = False
@@ -33,13 +33,13 @@ def on_message(client, userdata, msg):
             for entry in otherCoordinates:
                 if entry[0] == stationID:
                     # Update lat and lon if stationID is found
-                    entry[1] = lat
-                    entry[2] = lon
+                    entry[1] = lon
+                    entry[2] = lat
                     exists = True
                     break
             # If stationID does not exist, append the new data
             if not exists:
-                otherCoordinates.append([stationID, lat, lon])
+                otherCoordinates.append([stationID, lon, lat])
 
 def read_sensor_data(filename):
     coords = []
@@ -71,8 +71,9 @@ def plot_heat_map(data, title):
     return fig, ax
 
 def animate_floating_point(ax, range_radius):
-    point, = ax.plot([], [], 'bo', markersize=10)  # Blue point
+    point, = ax.plot([], [], 'ro', markersize=10)  # Blue point
     circle = plt.Circle((0, 0), range_radius, color='b', fill=False)
+    circle2 = plt.Circle((0, 0), range_radius/3, color='b', fill=True)
     red_points, = ax.plot([], [], 'ro', markersize=5)  # Red points
     red_texts = []  # List to store text annotations
 
@@ -81,7 +82,9 @@ def animate_floating_point(ax, range_radius):
         x, y = selfCoordinates
         point.set_data(x, y)
         circle.center = (x, y)
-        ax.add_patch(circle)  # Add the circle to the plot
+        ax.add_patch(circle)
+        circle2.center = (x, y)
+        ax.add_patch(circle2)
 
         # Clear previous texts
         for text in red_texts:
