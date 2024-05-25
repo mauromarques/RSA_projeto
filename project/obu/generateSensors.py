@@ -5,12 +5,12 @@ import os
 
 # Function to generate sensor readings based on distance to the heat points
 def generate_heat_map_readings(grid_size, base_value, variation_range, num_heat_points):
-    heat_points = [(random.randint(0, grid_size - 1), random.randint(0, grid_size - 1)) for _ in range(num_heat_points)]
+    heat_points = [(random.randint(0, grid_size), random.randint(0, grid_size)) for _ in range(num_heat_points)]
 
     readings = []
 
-    for x in range(grid_size):
-        for y in range(grid_size):
+    for x in range(grid_size + 1):  # Adjusted range to include the maximum coordinate
+        for y in range(grid_size + 1):  # Adjusted range to include the maximum coordinate
             distances = [math.sqrt((x - hx)**2 + (y - hy)**2) for hx, hy in heat_points]
             min_distance = min(distances)
             value = max(base_value - min_distance * variation_range, 0)
@@ -54,4 +54,3 @@ for filename, readings in sensor_data.items():
             file.write(f"{x},{y},{value}\n")
 
 print(f"Heat map sensor readings generated with {num_heat_points} heat points, base value of {base_value}, and variation range of {variation_range}. Data saved to file.")
-

@@ -60,15 +60,27 @@ def read_sensor_data(filename):
 
     return data
 
-def plot_heat_map(data, title):
+def plot_heat_map(data, title, background_image=None, opacity=0.7):
     # Create a custom colormap
     cmap = mcolors.LinearSegmentedColormap.from_list('custom_cmap', ['green', 'yellow', 'red'])
     
     fig, ax = plt.subplots(figsize=(10, 10))
-    cax = ax.imshow(data, cmap=cmap, interpolation='nearest')
+    
+    # Plot background image if provided
+    if background_image is not None:
+        ax.imshow(background_image, extent=[-1, data.shape[1], -1, data.shape[0]])
+    
+    # Plot heat map with specified opacity
+    cax = ax.imshow(data, cmap=cmap, interpolation='nearest', alpha=opacity)
+    
+    # Add colorbar
     fig.colorbar(cax)
+    
+    # Set title
     ax.set_title(title)
+    
     return fig, ax
+
 
 def animate_floating_point(ax, range_radius):
     point, = ax.plot([], [], 'ro', markersize=10)  # Red point for self
@@ -129,7 +141,9 @@ otherCoordinates = []
 sensor_data = read_sensor_data(sensor_data_file)
 
 # Plot heat map
-fig, ax = plot_heat_map(sensor_data, "Heat Map")
+background_image = plt.imread('map.webp')
+opacity = 0.6
+fig, ax = plot_heat_map(sensor_data, "Heat Map", background_image, opacity)
 
 # Base IP address
 baseIP = "192.168.98."
