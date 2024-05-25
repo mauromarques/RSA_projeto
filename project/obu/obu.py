@@ -6,10 +6,12 @@ import sys
 import math
 import random
 import datetime
+import heapq
 
 # Global variables
 currentPosition = (0, 0)
 sensor_values = {}
+sensorMap = {}
 station_locations = {}
 listening_ip = ""
 clients = []
@@ -94,7 +96,108 @@ def connect_client(ip):
     clients.append(client)
     connected_ips.add(ip)
 
-def next_step(current_position, objective=None):
+
+def a_star_search(mapa, start, goal):
+    def heuristic(a, b):
+        return abs(a[0] - b[0]) + abs(a[1] - b[1])
+    
+    def get_neighbors(position):
+        x, y = position
+        neighbors = [
+            (x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1),
+            (x + 1, y + 1), (x - 1, y + 1), (x + 1, y - 1), (x - 1, y - 1)
+        ]
+        # Filter out neighbors that are out of bounds or unsafe
+        #neighbors = [(nx, ny) for nx, ny in neighbors if 0 <= nx < len(map) and 0 <= ny < len(map[0]) and map[nx][ny] == 0]
+        return neighbors
+    
+    open_set = []
+    heapq.heappush(open_set, (0, start))
+    came_from = {}
+    cost_so_far = {start: 0}
+
+    while open_set:
+        current_priority, current = heapq.heappop(open_set)
+
+        if current == goal:
+            break
+        print(start)
+        print("\n")
+        for neighbor in get_neighbors(current):
+            #neighbor = (current[0] + dx, current[1] + dy)
+            if neighbor in mapa:
+                new_cost = cost_so_far[current] + mapa[neighbor]
+                if neighbor not in cost_so_far or new_cost < cost_so_far[neighbor]:
+                    cost_so_far[neighbor] = new_cost
+                    priority = new_cost + heuristic(goal, neighbor)
+                    heapq.heappush(open_set, (priority, neighbor))
+                    came_from[neighbor] = current
+                 
+                #print("neighbor")
+
+    # Reconstruir o caminho a partir do 'goal' até 'start'
+    path = []
+    if goal in came_from:
+        current = goal
+        while current != start:
+            path.append(current)
+            current = came_from[current]
+        path.append(start)
+        path.reverse()
+    print(path)
+    return path
+    
+    """"
+    open_set = []
+    heapq.heappush(open_set, (0, start))
+
+    came_from = {}
+    g_score = {start: 0}
+    f_score = {start: heuristic(start, goal)}
+
+    while open_set:
+        _, current = heapq.heappop(open_set)
+
+        if current == goal:
+            path = []
+            while current in came_from:
+                path.append(current)
+                current = came_from[current]
+            path.reverse()
+            return path
+
+        for neighbor in get_neighbors(current):
+            tentative_g_score = g_score[current] + mapa[neighbor[0]][neighbor[1]]
+            if neighbor not in g_score or tentative_g_score < g_score[neighbor]:
+                came_from[neighbor] = current
+                g_score[neighbor] = tentative_g_score
+                f_score[neighbor] = tentative_g_score + heuristic(neighbor, goal)
+                heapq.heappush(open_set, (f_score[neighbor], neighbor))
+
+    return []  # Retorna uma lista vazia se não houver caminho
+    """
+
+
+
+def next_step(current_position, objective, mapa):
+    path = a_star_search(mapa, current_position, objective)
+
+    if path:
+        return path[1]  # Retorna o próximo passo na rota
+    
+    #elif (current_position != objective and path == []):
+    #    x = current_position[0] + 1
+    #    y = current_position[1]
+    #    print("oiiii")
+    #    return (x,y)  # Se não houver caminho, permanece na posição atual
+    
+    else:
+        return current_position
+        
+"""
+    
+
+def next_step(current_position, objective=None,mapa = None):
     x, y = current_position
     possible_moves = [
         (x + 1, y),     # Right
@@ -123,6 +226,7 @@ def next_step(current_position, objective=None):
         next_move = random.choice(possible_moves)
 
     return next_move
+"""
 
 def find_lowest_value_position():
     global sensor_values
@@ -131,7 +235,7 @@ def find_lowest_value_position():
     return min(sensor_values, key=sensor_values.get)
 
 def update_sensor_values_within_radius():
-    global sensor_values, currentPosition
+    global sensor_values, currentPosition, sensorMap
     values_for_calculation = {}
     total_value = 0
     count = 0
@@ -140,6 +244,7 @@ def update_sensor_values_within_radius():
         for line in f:
             x, y, value = map(float, line.strip().split(','))
             distance = math.sqrt((currentPosition[0] - x)**2 + (currentPosition[1] - y)**2)
+            sensorMap[(x,y)] = value
             if distance <= 5:
                 values_for_calculation[(x, y)] = value
                 total_value += value
@@ -175,7 +280,7 @@ def generateCam():
     update_sensor_values_within_radius()
     objective = find_lowest_value_position()
 
-    lat, lon = next_step(currentPosition, objective)
+    lat, lon = next_step(currentPosition, objective,sensorMap)
     station_locations[int(int(listening_ip)/10)] = (lat, lon)
 
     currentPosition = (lat, lon)
