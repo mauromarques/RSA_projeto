@@ -12,13 +12,28 @@ def on_connect(client, userdata, flags, rc, properties):
     client.subscribe("sensors/evaluation")
 
 def on_message(client, userdata, msg):
-    global sensor_values
+    global sensor_values, station_locations, currentPosition
     message = msg.payload.decode('utf-8')
-    #print('Topic: ' + msg.topic)
-    #print('Message: ' + message + "\n")
     obj = json.loads(message)
+
+    # Update the station's location in the global dictionary
+    station_id = obj.get("stationID")
+    latitude = int(obj.get("latitude"))
+    longitude = int(obj.get("longitude"))
+    if station_id is not None and latitude is not None and longitude is not None:
+        station_locations[station_id] = (latitude, longitude)
+
+    # Find connected nodes
+    connected_nodes = find_connected_nodes(int(int(listening_ip) / 10), station_locations, 15)
+    # Check if the sender station is in the connected nodes
+    if station_id not in connected_nodes:
+        print(f"Message from station {station_id} rejected (not connected)")
+        return
     
+    print(f"Message: {msg.topic} from: {station_id}")
+
     if msg.topic == "vanetza/out/cam":
+        print(str(station_locations))
         sender_ip = str(obj.get("stationID")*10)
         if sender_ip and sender_ip not in connected_ips:
             connect_client(sender_ip)
@@ -30,7 +45,7 @@ def on_message(client, userdata, msg):
             y = value.get("y")
             if x is not None and y is not None and value.get("value") is not None:
                 sensor_values[(x, y)] = value.get("value")
-        
+
 
 def connect_client(ip):
     global baseIP, clients, connected_ips
@@ -40,7 +55,6 @@ def connect_client(ip):
     clients.append(client)
     connected_ips.add(ip)
     print(f"Connected to new client: {baseIP}{ip}")
-
 
 def next_step(current_position, objective=None):
     x, y = current_position
@@ -85,7 +99,7 @@ def find_lowest_value_position():
         return None
     # Find the (x, y) position with the lowest sensor value
     return min(sensor_values, key=sensor_values.get)
-    
+
 def update_sensor_values_within_radius():
     global sensor_values, currentPosition
     values_for_calculation = {}
@@ -104,8 +118,29 @@ def update_sensor_values_within_radius():
     if count > 0:
         average_value = total_value / count
         sensor_values[currentPosition] = average_value
-    print("LULU")
-    print(sensor_values[currentPosition])
+
+def find_connected_nodes(current_position, station_locations, radius):
+    visited = set()
+    queue = [current_position]
+    connected_nodes = []
+
+    while queue:
+        node = queue.pop(0)
+        if node not in visited:
+            visited.add(node)
+            connected_nodes.append(node)
+
+            # Check for direct connections within the radius
+            for other_node in station_locations.keys():
+                if other_node != node and other_node not in visited:
+                    node_coords = station_locations[node]
+                    other_node_coords = station_locations[other_node]
+                    distance = math.sqrt((node_coords[0] - other_node_coords[0])**2 + (node_coords[1] - other_node_coords[1])**2)
+                    if distance <= radius:
+                        queue.append(other_node)
+
+    return connected_nodes
+
 
 def generateCam():
     global currentPosition, sensor_values
@@ -113,20 +148,16 @@ def generateCam():
     objective = find_lowest_value_position()
     
     lat, lon = next_step(currentPosition, objective)
+    station_locations[int(int(listening_ip)/10)] = (lat, lon)
+
     currentPosition = (lat, lon)
     with open('in_cam.json', 'r') as f:
         m = json.load(f)
     m["latitude"] = lat
     m["longitude"] = lon
-    m["stationID"] = int(int(listening_ip)/10)
+    m["stationID"] = int(int(listening_ip) / 10)
     client.publish("vanetza/in/cam", json.dumps(m))
     client.publish("simulation/location_update", json.dumps(m))
-  
-    try:
-        print(objective)
-        print(sensor_values[objective])
-    except:
-        pass
 
 def generateLocationEvaluation():
     global currentPosition
@@ -137,7 +168,7 @@ def generateLocationEvaluation():
     # Initialize the message
     with open('sensors_evaluation.json', 'r') as f:
         m = json.load(f)
-    m["stationID"] = int(listening_ip) / 10
+    m["stationID"] = int(int(listening_ip) / 10)
     m["latitude"], m["longitude"] = currentPosition
     m["values"] = []
 
@@ -160,8 +191,9 @@ def send_cam():
         sleep(1)
 
 # Command-line argument
-global currentPosition, sensor_values
+global currentPosition, sensor_values, station_locations
 sensor_values = {}
+station_locations = {}  # Global dictionary to store station locations
 listening_ip = sys.argv[1]
 currentPosition = (int(sys.argv[2]), int(sys.argv[3]))
 

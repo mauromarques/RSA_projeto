@@ -71,11 +71,12 @@ def plot_heat_map(data, title):
     return fig, ax
 
 def animate_floating_point(ax, range_radius):
-    point, = ax.plot([], [], 'ro', markersize=10)  # Blue point
+    point, = ax.plot([], [], 'ro', markersize=10)  # Red point for self
     circle = plt.Circle((0, 0), range_radius, color='b', fill=False)
-    circle2 = plt.Circle((0, 0), range_radius/3, color='b', fill=True)
-    red_points, = ax.plot([], [], 'ro', markersize=5)  # Red points
+    circle2 = plt.Circle((0, 0), range_radius / 3, color='b', fill=True)
+    red_points, = ax.plot([], [], 'ro', markersize=5)  # Red points for others
     red_texts = []  # List to store text annotations
+    red_circles = []  # List to store red circles
 
     def update(frame):
         global selfCoordinates, otherCoordinates
@@ -86,10 +87,14 @@ def animate_floating_point(ax, range_radius):
         circle2.center = (x, y)
         ax.add_patch(circle2)
 
-        # Clear previous texts
+        # Clear previous texts and circles
         for text in red_texts:
             text.remove()
         red_texts.clear()
+        
+        for rc in red_circles:
+            rc.remove()
+        red_circles.clear()
 
         if len(otherCoordinates) > 0:
             other_x, other_y = zip(*[coord[1:] for coord in otherCoordinates])
@@ -98,10 +103,13 @@ def animate_floating_point(ax, range_radius):
             for (stationID, ox, oy) in otherCoordinates:
                 text = ax.text(ox, oy, str(stationID), color='red', fontsize=12, ha='center', va='bottom')
                 red_texts.append(text)
+                red_circle = plt.Circle((ox, oy), range_radius, color='r', fill=False)
+                ax.add_patch(red_circle)
+                red_circles.append(red_circle)
         else:
             red_points.set_data([], [])
-        
-        return point, red_points, *red_texts
+
+        return point, red_points, *red_texts, *red_circles
 
     ani = animation.FuncAnimation(ax.figure, update, frames=1, interval=0, blit=True)
     plt.show()

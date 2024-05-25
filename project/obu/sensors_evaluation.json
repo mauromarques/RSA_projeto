@@ -1,5 +1,7 @@
 {
     "stationID": 1,
     "stationType": 15,
+    "latitude": 10,
+    "longitude": 10,
     "values": 1
 }
