@@ -5,9 +5,50 @@ from time import sleep
 import sys
 import math
 import random
+import datetime
 
-def on_connect(client, userdata, flags, rc, properties):
-    print("Connected with result code " + str(rc))
+# Global variables
+currentPosition = (0, 0)
+sensor_values = {}
+station_locations = {}
+listening_ip = ""
+clients = []
+connected_ips = set()
+baseIP = "192.168.98."
+table_data = [
+    {"number": i, "last_update_time": "--", "status": "MISSING", "gps_location": "--", "action": "--"}
+    for i in range(2, 7)
+]
+
+def update_table():
+    current_time = datetime.datetime.now()
+    for row in table_data:
+        station_id = row["number"]
+        if station_id in station_locations and row["status"] == "CONNECTED":
+            latitude, longitude = station_locations[station_id]
+            row["gps_location"] = f"{latitude:.4f}, {longitude:.4f}"
+            row_update_time = row["last_update_time"]
+            if row_update_time != "--":
+                row_update_time = datetime.datetime.strptime(row_update_time, "%Y-%m-%d %H:%M:%S")
+                time_difference = (current_time - row_update_time).total_seconds()
+                if time_difference > 10:
+                    row["status"] = "MISSING"
+
+def print_table():
+    print(f"OBSERVING OBU: 2\n{'No':<5} {'Last Update Time':<20} {'Status':<10} {'GPS Location':<20} {'Action'}")
+    print("-" * 80)
+    for row in table_data:
+        print(f"{row['number']:<5} {row['last_update_time']:<20} {row['status']:<10} {row['gps_location']:<20} {row['action']}")
+
+def update_table_status(station_id, status, update_time=None):
+    for row in table_data:
+        if row["number"] == station_id:
+            row["status"] = status
+            if update_time:
+                row["last_update_time"] = update_time
+            break
+
+def on_connect(client, userdata, flags, rc, properties=None):
     client.subscribe("vanetza/out/cam")
     client.subscribe("sensors/evaluation")
 
@@ -16,36 +57,34 @@ def on_message(client, userdata, msg):
     message = msg.payload.decode('utf-8')
     obj = json.loads(message)
 
-    # Update the station's location in the global dictionary
     station_id = obj.get("stationID")
-    latitude = int(obj.get("latitude"))
-    longitude = int(obj.get("longitude"))
+    latitude = obj.get("latitude")
+    longitude = obj.get("longitude")
+
     if station_id is not None and latitude is not None and longitude is not None:
         station_locations[station_id] = (latitude, longitude)
 
-    # Find connected nodes
     connected_nodes = find_connected_nodes(int(int(listening_ip) / 10), station_locations, 15)
-    # Check if the sender station is in the connected nodes
+
     if station_id not in connected_nodes:
-        print(f"Message from station {station_id} rejected (not connected)")
+        update_table_status(station_id, "MISSING")
         return
     
-    print(f"Message: {msg.topic} from: {station_id}")
+    update_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    update_table_status(station_id, "CONNECTED", update_time)
 
     if msg.topic == "vanetza/out/cam":
-        print(str(station_locations))
         sender_ip = str(obj.get("stationID")*10)
         if sender_ip and sender_ip not in connected_ips:
             connect_client(sender_ip)
         client.publish("simulation/location_update", json.dumps(obj))
-        
+
     if msg.topic == "sensors/evaluation":
         for value in obj.get("values", []):
             x = value.get("x")
             y = value.get("y")
             if x is not None and y is not None and value.get("value") is not None:
                 sensor_values[(x, y)] = value.get("value")
-
 
 def connect_client(ip):
     global baseIP, clients, connected_ips
@@ -54,12 +93,9 @@ def connect_client(ip):
     client.connect(baseIP + ip, 1883, 60)
     clients.append(client)
     connected_ips.add(ip)
-    print(f"Connected to new client: {baseIP}{ip}")
 
 def next_step(current_position, objective=None):
     x, y = current_position
-
-    # Define all possible moves including diagonals
     possible_moves = [
         (x + 1, y),     # Right
         (x - 1, y),     # Left
@@ -73,22 +109,17 @@ def next_step(current_position, objective=None):
 
     if objective:
         obj_x, obj_y = objective
-        
-        # Calculate Manhattan distance to objective for each move
+
         def distance(move):
             return abs(move[0] - obj_x) + abs(move[1] - obj_y)
 
-        # Filter moves that are closer to the objective
         closer_moves = [move for move in possible_moves if distance(move) < distance(current_position)]
 
         if closer_moves:
-            # Choose the move among the closer moves that minimizes the distance
             next_move = min(closer_moves, key=lambda move: distance(move))
         else:
-            # If no closer moves are available, fall back to the move that minimizes the distance overall
             next_move = min(possible_moves, key=lambda move: distance(move))
     else:
-        # If no objective, choose a random move
         next_move = random.choice(possible_moves)
 
     return next_move
@@ -97,7 +128,6 @@ def find_lowest_value_position():
     global sensor_values
     if not sensor_values:
         return None
-    # Find the (x, y) position with the lowest sensor value
     return min(sensor_values, key=sensor_values.get)
 
 def update_sensor_values_within_radius():
@@ -114,7 +144,7 @@ def update_sensor_values_within_radius():
                 values_for_calculation[(x, y)] = value
                 total_value += value
                 count += 1
-    # Calculate the average value
+
     if count > 0:
         average_value = total_value / count
         sensor_values[currentPosition] = average_value
@@ -130,7 +160,6 @@ def find_connected_nodes(current_position, station_locations, radius):
             visited.add(node)
             connected_nodes.append(node)
 
-            # Check for direct connections within the radius
             for other_node in station_locations.keys():
                 if other_node != node and other_node not in visited:
                     node_coords = station_locations[node]
@@ -141,12 +170,11 @@ def find_connected_nodes(current_position, station_locations, radius):
 
     return connected_nodes
 
-
 def generateCam():
     global currentPosition, sensor_values
     update_sensor_values_within_radius()
     objective = find_lowest_value_position()
-    
+
     lat, lon = next_step(currentPosition, objective)
     station_locations[int(int(listening_ip)/10)] = (lat, lon)
 
@@ -165,18 +193,15 @@ def generateLocationEvaluation():
     global clients
     global sensor_values
 
-    # Initialize the message
     with open('sensors_evaluation.json', 'r') as f:
         m = json.load(f)
     m["stationID"] = int(int(listening_ip) / 10)
     m["latitude"], m["longitude"] = currentPosition
     m["values"] = []
 
-    # Add all sensor values to the message
     for (x, y), value in sensor_values.items():
         m["values"].append({"x": x, "y": y, "value": value})
 
-    # Publish the message to all clients
     for client in clients:
         client.publish("sensors/evaluation", json.dumps(m))
 
@@ -190,21 +215,16 @@ def send_cam():
         generateCam()
         sleep(1)
 
+def print_table_periodically():
+    while True:
+        update_table()
+        print("\033[H\033[J", end="")  # Clear screen
+        print_table()
+        sleep(1)
+
 # Command-line argument
-global currentPosition, sensor_values, station_locations
-sensor_values = {}
-station_locations = {}  # Global dictionary to store station locations
 listening_ip = sys.argv[1]
 currentPosition = (int(sys.argv[2]), int(sys.argv[3]))
-
-# Array to hold MQTT clients
-clients = []
-
-# Set to keep track of connected IPs
-connected_ips = set()
-
-# Base IP address
-baseIP = "192.168.98."
 
 # Create the client for listening to messages
 client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
@@ -222,3 +242,6 @@ threading.Thread(target=client.loop_forever).start()
 # Start the threads for sending periodic messages
 threading.Thread(target=send_cam).start()
 threading.Thread(target=send_locationEvaluation).start()
+
+# Start the thread for printing the table periodically
+threading.Thread(target=print_table_periodically).start()
