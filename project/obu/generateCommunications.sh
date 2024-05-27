@@ -8,7 +8,7 @@ fi
 
 # Number of applications to launch
 num_apps=$1
-GRID_DIMENSION=40
+GRID_DIMENSION=100
 
 # Generate the identifiers
 identifiers=()

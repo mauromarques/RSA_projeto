@@ -14,7 +14,7 @@ def generate_heat_map_readings(grid_size, base_value, variation_range, num_heat_
             distances = [math.sqrt((x - hx)**2 + (y - hy)**2) for hx, hy in heat_points]
             min_distance = min(distances)
             value = max(base_value - min_distance * variation_range, 0)
-            value += random.uniform(-variation_range, variation_range)  # Add some noise
+            #value += random.uniform(-variation_range, variation_range)  # Add some noise
             readings.append((x, y, value))
 
     return readings, heat_points

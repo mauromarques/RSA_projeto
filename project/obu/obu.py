@@ -12,15 +12,15 @@ from enum import Enum
 # Node states
 class NodeAction(Enum):
     STATIONED = "stationed"
-    MOVING_TOWARDS_SAFETY = "moving towards safety"
-    STUCK = "stuck"
+    MOVING_TOWARDS_SAFETY = "moving towards safe spot"
     SEARCHING_FOR_SAFETY = "searching for safety"
-    SEARCHING_FOR_NODE = "searching for node"
-    SEARCHING_BLIND = "searching blindly for a safe spot"
+    MOVING_OUT_OF_DANGER = "in danger, following a lead"
 
 # Global variables
-action = NodeAction.SEARCHING_BLIND
+action = NodeAction.SEARCHING_FOR_SAFETY
+objective = None
 currentPosition = (0, 0)
+full_sensor_data = {}
 sensor_values = {}
 sensorMap = {}
 station_locations = {}
@@ -80,7 +80,7 @@ def on_message(client, userdata, msg):
     if station_id is not None and latitude is not None and longitude is not None:
         station_locations[station_id] = (latitude, longitude)
 
-    connected_nodes = find_connected_nodes(int(int(listening_ip) / 10), station_locations, 15)
+    connected_nodes = find_connected_nodes(int(int(listening_ip) / 10), station_locations, 70)
 
     if station_id not in connected_nodes:
         update_table_status(station_id, "MISSING")
@@ -161,15 +161,18 @@ def a_star_search(mapa, start, goal):
 
     return path
 
-def next_step(current_position, objective, mapa):
-    if action == NodeAction.MOVING_TOWARDS_SAFETY: # Node has a better objective and is trying to reach it
+def next_step(current_position, mapa):
+    global objective, action
+    #print("next step action: " + str(action))
+    if action == NodeAction.MOVING_TOWARDS_SAFETY or action == NodeAction.MOVING_OUT_OF_DANGER: # Node has a better objective and is trying to reach it
+        #print("MOVING: " + str(current_position) + " " + str(objective) + " " + str(sensor_values[current_position]) + " " + str(sensor_values[objective]))
         path = a_star_search(mapa, current_position, objective)
         if path:
             return path[1]  # Retorna o próximo passo na rota   
         else:
             return current_position
     if action == NodeAction.SEARCHING_FOR_SAFETY: # Node has no better objective and is looking by itself
-        pass
+        return current_position
     if action == NodeAction.STATIONED: # Node has reached safety
         return current_position
     
@@ -178,28 +181,33 @@ def find_lowest_value_position():
     global sensor_values
     if not sensor_values:
         return None
-    return min(sensor_values, key=sensor_values.get)
+    lowest_key = min(sensor_values, key=sensor_values.get)
+    lowest_value = sensor_values[lowest_key]
+    return (lowest_key, lowest_value)
 
-def update_sensor_values_within_radius():
-    global sensor_values, currentPosition, sensorMap
-    values_for_calculation = {}
-    total_value = 0
-    count = 0
 
+def read_sensor_data():
+    global full_sensor_data
+    full_sensor_data = {}
     with open('sensor_data.txt', 'r') as f:
         for line in f:
             x, y, value = map(float, line.strip().split(','))
-            distance = math.sqrt((currentPosition[0] - x)**2 + (currentPosition[1] - y)**2)
-            
-            if distance <= 5:
-                values_for_calculation[(x, y)] = value
-                sensorMap[(x,y)] = value
-                total_value += value
-                count += 1
-            else:
-                sensorMap[(x,y)] = 404
+            full_sensor_data[(x, y)] = value
 
-
+def update_sensor_values_within_radius():
+    global sensor_values, currentPosition, sensorMap, full_sensor_data
+    values_for_calculation = {}
+    total_value = 0
+    count = 0
+    for (x, y), value in full_sensor_data.items():
+        distance = math.sqrt((currentPosition[0] - x)**2 + (currentPosition[1] - y)**2)
+        if distance <= 5:
+            values_for_calculation[(x, y)] = value
+            sensorMap[(x, y)] = value
+            total_value += value
+            count += 1
+        else:
+            sensorMap[(x, y)] = 404
     if count > 0:
         average_value = total_value / count
         sensor_values[currentPosition] = average_value
@@ -226,11 +234,10 @@ def find_connected_nodes(current_position, station_locations, radius):
     return connected_nodes
 
 def generateCam():
-    global currentPosition, sensor_values
+    global currentPosition, sensor_values, objective
     update_sensor_values_within_radius()
-    objective = find_lowest_value_position()
 
-    lat, lon = next_step(currentPosition, objective,sensorMap)
+    lat, lon = next_step(currentPosition,sensorMap)
     station_locations[int(int(listening_ip)/10)] = (lat, lon)
 
     currentPosition = (lat, lon)
@@ -298,9 +305,36 @@ def print_table_periodically():
         print_table()
         sleep(1)
 
+def updateAction():
+    while True:
+        newAction()
+        sleep(0.5)
+
+def newAction():
+    global action, currentPosition, sensor_values, objective
+    update_sensor_values_within_radius()
+    safestPlaceKnown, safestPlaceEvaluation = find_lowest_value_position()
+    # FOUND SAFE SPOT, IS NOT AT SAFE SPOT -> move there
+    if safestPlaceEvaluation <= 29 and safestPlaceKnown != currentPosition:
+        action = NodeAction.MOVING_TOWARDS_SAFETY
+        objective = safestPlaceKnown
+    # FOUND SAFE SPOT, IS AT SAFE SPOT -> stay still
+    elif safestPlaceEvaluation <= 29 and safestPlaceKnown == currentPosition:
+        action = NodeAction.STATIONED
+    # FOUND MEDIUM SAFE SPOT, IS AT DANGEROUS SPOT -> move there
+    elif safestPlaceEvaluation >= 30 and safestPlaceEvaluation <= 49 and sensor_values[currentPosition] >= 50:
+        action = NodeAction.MOVING_OUT_OF_DANGER
+        objective = safestPlaceKnown
+    # NOT FOUND SAFE SPOT -> search for better spot
+    else:
+        action = NodeAction.SEARCHING_FOR_SAFETY
+
 # Command-line argument
 listening_ip = sys.argv[1]
 currentPosition = (int(sys.argv[2]), int(sys.argv[3]))
+
+# Stores all sensor readings
+read_sensor_data()
 
 # Create the client for listening to messages
 client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
@@ -319,6 +353,7 @@ threading.Thread(target=client.loop_forever).start()
 threading.Thread(target=send_cam).start()
 threading.Thread(target=send_locationEvaluation).start()
 threading.Thread(target=send_actionReport).start()
+threading.Thread(target=updateAction).start()
 
 # Start the thread for printing the table periodically
 threading.Thread(target=print_table_periodically).start()

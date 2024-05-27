@@ -85,7 +85,7 @@ def plot_heat_map(data, title, background_image=None, opacity=0.7):
 def animate_floating_point(ax, range_radius):
     point, = ax.plot([], [], 'ro', markersize=10)  # Red point for self
     circle = plt.Circle((0, 0), range_radius, color='b', fill=False)
-    circle2 = plt.Circle((0, 0), range_radius / 3, color='b', fill=True)
+    circle2 = plt.Circle((0, 0), 5, color='b', fill=True)
     red_points, = ax.plot([], [], 'ro', markersize=5)  # Red points for others
     red_texts = []  # List to store text annotations
     red_circles = []  # List to store red circles
@@ -133,7 +133,7 @@ if len(sys.argv) != 3:
 global selfCoordinates, listening_ip, otherCoordinates
 sensor_data_file = sys.argv[1]
 listening_ip = sys.argv[2]
-range_radius = 15  # Radius of the range circle
+range_radius = 60  # Radius of the range circle
 selfCoordinates = (0,0)
 otherCoordinates = []
 
