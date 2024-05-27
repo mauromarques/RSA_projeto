@@ -3,9 +3,9 @@
 # Define variables
 OBU_TO_OBSERVE=20
 NUM_HEAT_POINTS=5
-GRID_DIMENSION=100
+GRID_DIMENSION=40
 SENSOR_MAX_VALUE=100
-SENSOR_VARIATION_RANGE=3
+SENSOR_VARIATION_RANGE=2
 
 # Execute generateSensors.py script
 echo "Executing generateSensors.py..."

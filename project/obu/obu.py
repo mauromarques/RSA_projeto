@@ -114,7 +114,6 @@ def connect_client(ip):
     clients.append(client)
     connected_ips.add(ip)
 
-
 def a_star_search(mapa, start, goal):
     def heuristic(a, b):
         return abs(a[0] - b[0]) + abs(a[1] - b[1])
@@ -161,81 +160,20 @@ def a_star_search(mapa, start, goal):
         path.reverse()
 
     return path
-    
-    """"
-    open_set = []
-    heapq.heappush(open_set, (0, start))
-
-    came_from = {}
-    g_score = {start: 0}
-    f_score = {start: heuristic(start, goal)}
-
-    while open_set:
-        _, current = heapq.heappop(open_set)
-
-        if current == goal:
-            path = []
-            while current in came_from:
-                path.append(current)
-                current = came_from[current]
-            path.reverse()
-            return path
-
-        for neighbor in get_neighbors(current):
-            tentative_g_score = g_score[current] + mapa[neighbor[0]][neighbor[1]]
-            if neighbor not in g_score or tentative_g_score < g_score[neighbor]:
-                came_from[neighbor] = current
-                g_score[neighbor] = tentative_g_score
-                f_score[neighbor] = tentative_g_score + heuristic(neighbor, goal)
-                heapq.heappush(open_set, (f_score[neighbor], neighbor))
-
-    return []  # Retorna uma lista vazia se não houver caminho
-    """
-
-
 
 def next_step(current_position, objective, mapa):
-    path = a_star_search(mapa, current_position, objective)
-
-    if path:
-        return path[1]  # Retorna o próximo passo na rota   
-    else:
-        return current_position
-        
-"""
-    
-
-def next_step(current_position, objective=None,mapa = None):
-    x, y = current_position
-    possible_moves = [
-        (x + 1, y),     # Right
-        (x - 1, y),     # Left
-        (x, y + 1),     # Up
-        (x, y - 1),     # Down
-        (x + 1, y + 1), # Up-right
-        (x - 1, y + 1), # Up-left
-        (x + 1, y - 1), # Down-right
-        (x - 1, y - 1)  # Down-left
-    ]
-
-    if objective:
-        obj_x, obj_y = objective
-
-        def distance(move):
-            return abs(move[0] - obj_x) + abs(move[1] - obj_y)
-
-        closer_moves = [move for move in possible_moves if distance(move) < distance(current_position)]
-
-        if closer_moves:
-            next_move = min(closer_moves, key=lambda move: distance(move))
+    if action == NodeAction.MOVING_TOWARDS_SAFETY: # Node has a better objective and is trying to reach it
+        path = a_star_search(mapa, current_position, objective)
+        if path:
+            return path[1]  # Retorna o próximo passo na rota   
         else:
-            next_move = min(possible_moves, key=lambda move: distance(move))
-    else:
-        next_move = random.choice(possible_moves)
-
-    return next_move
-"""
-
+            return current_position
+    if action == NodeAction.SEARCHING_FOR_SAFETY: # Node has no better objective and is looking by itself
+        pass
+    if action == NodeAction.STATIONED: # Node has reached safety
+        return current_position
+    
+        
 def find_lowest_value_position():
     global sensor_values
     if not sensor_values:
