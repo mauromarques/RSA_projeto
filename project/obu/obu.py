@@ -121,8 +121,7 @@ def a_star_search(mapa, start, goal):
 
         if current == goal:
             break
-        print(start)
-        print("\n")
+
         for neighbor in get_neighbors(current):
             #neighbor = (current[0] + dx, current[1] + dy)
             if neighbor in mapa:
@@ -132,8 +131,6 @@ def a_star_search(mapa, start, goal):
                     priority = new_cost + heuristic(goal, neighbor)
                     heapq.heappush(open_set, (priority, neighbor))
                     came_from[neighbor] = current
-                 
-                #print("neighbor")
 
     # Reconstruir o caminho a partir do 'goal' até 'start'
     path = []
@@ -144,7 +141,7 @@ def a_star_search(mapa, start, goal):
             current = came_from[current]
         path.append(start)
         path.reverse()
-    print(path)
+
     return path
     
     """"
@@ -183,14 +180,7 @@ def next_step(current_position, objective, mapa):
     path = a_star_search(mapa, current_position, objective)
 
     if path:
-        return path[1]  # Retorna o próximo passo na rota
-    
-    #elif (current_position != objective and path == []):
-    #    x = current_position[0] + 1
-    #    y = current_position[1]
-    #    print("oiiii")
-    #    return (x,y)  # Se não houver caminho, permanece na posição atual
-    
+        return path[1]  # Retorna o próximo passo na rota   
     else:
         return current_position
         
@@ -244,11 +234,15 @@ def update_sensor_values_within_radius():
         for line in f:
             x, y, value = map(float, line.strip().split(','))
             distance = math.sqrt((currentPosition[0] - x)**2 + (currentPosition[1] - y)**2)
-            sensorMap[(x,y)] = value
+            
             if distance <= 5:
                 values_for_calculation[(x, y)] = value
+                sensorMap[(x,y)] = value
                 total_value += value
                 count += 1
+            else:
+                sensorMap[(x,y)] = 404
+
 
     if count > 0:
         average_value = total_value / count
