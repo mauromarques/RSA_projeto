@@ -8,7 +8,7 @@ fi
 
 # Number of applications to launch
 num_apps=$1
-GRID_DIMENSION=35
+GRID_DIMENSION=100
 
 # Generate the identifiers
 identifiers=()
@@ -21,7 +21,7 @@ for ((i = 0; i < num_apps; i++)); do
   self_id=${identifiers[i]}
   randomX=$(shuf -i 0-$GRID_DIMENSION -n 1)
   randomY=$(shuf -i 0-$GRID_DIMENSION -n 1)
-  params=("$self_id $randomX $randomY")
+  params=("$self_id $randomX $randomY $GRID_DIMENSION")
 
   gnome-terminal --tab -- bash -c "python3 obu.py ${params[*]} ; exec bash"
 done

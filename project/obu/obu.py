@@ -6,8 +6,19 @@ import sys
 import math
 import random
 import datetime
+from enum import Enum
+
+# Node states
+class NodeAction(Enum):
+    STATIONED = "stationed"
+    MOVING_TOWARDS_SAFETY = "moving towards safety"
+    STUCK = "stuck"
+    SEARCHING_FOR_SAFETY = "searching for safety"
+    SEARCHING_FOR_NODE = "searching for node"
+    SEARCHING_BLIND = "searching blindly for a safe spot"
 
 # Global variables
+action = NodeAction.MOVING_TOWARDS_SAFETY
 currentPosition = (0, 0)
 sensor_values = {}
 station_locations = {}
@@ -40,17 +51,20 @@ def print_table():
     for row in table_data:
         print(f"{row['number']:<5} {row['last_update_time']:<20} {row['status']:<10} {row['gps_location']:<20} {row['action']}")
 
-def update_table_status(station_id, status, update_time=None):
+def update_table_status(station_id, status, update_time=None, action=None):
     for row in table_data:
         if row["number"] == station_id:
             row["status"] = status
             if update_time:
                 row["last_update_time"] = update_time
+            if action:
+                row["action"] = action
             break
 
 def on_connect(client, userdata, flags, rc, properties=None):
     client.subscribe("vanetza/out/cam")
     client.subscribe("sensors/evaluation")
+    client.subscribe("report/action")
 
 def on_message(client, userdata, msg):
     global sensor_values, station_locations, currentPosition
@@ -85,6 +99,10 @@ def on_message(client, userdata, msg):
             y = value.get("y")
             if x is not None and y is not None and value.get("value") is not None:
                 sensor_values[(x, y)] = value.get("value")
+
+    if msg.topic == "report/action":
+        action = obj.get("values", [])
+        update_table_status(station_id, "CONNECTED", update_time, action=action)
 
 def connect_client(ip):
     global baseIP, clients, connected_ips
@@ -205,6 +223,22 @@ def generateLocationEvaluation():
     for client in clients:
         client.publish("sensors/evaluation", json.dumps(m))
 
+def generateActionReport():
+    global currentPosition
+    global listening_ip
+    global clients
+    global sensor_values
+    global action
+
+    with open('sensors_evaluation.json', 'r') as f:
+        m = json.load(f)
+    m["stationID"] = int(int(listening_ip) / 10)
+    m["latitude"], m["longitude"] = currentPosition
+    m["values"] = action.value
+
+    for client in clients:
+        client.publish("report/action", json.dumps(m))
+
 def send_locationEvaluation():
     while True:
         generateLocationEvaluation()
@@ -214,6 +248,11 @@ def send_cam():
     while True:
         generateCam()
         sleep(1)
+
+def send_actionReport():
+    while True:
+        generateActionReport()
+        sleep(2)
 
 def print_table_periodically():
     while True:
@@ -242,6 +281,7 @@ threading.Thread(target=client.loop_forever).start()
 # Start the threads for sending periodic messages
 threading.Thread(target=send_cam).start()
 threading.Thread(target=send_locationEvaluation).start()
+threading.Thread(target=send_actionReport).start()
 
 # Start the thread for printing the table periodically
 threading.Thread(target=print_table_periodically).start()
