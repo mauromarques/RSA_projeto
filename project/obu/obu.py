@@ -19,7 +19,7 @@ class NodeAction(Enum):
     SEARCHING_BLIND = "searching blindly for a safe spot"
 
 # Global variables
-action = NodeAction.MOVING_TOWARDS_SAFETY
+action = NodeAction.SEARCHING_BLIND
 currentPosition = (0, 0)
 sensor_values = {}
 sensorMap = {}
