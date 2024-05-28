@@ -26,6 +26,7 @@ sensorMap = {}
 station_locations = {}
 listening_ip = ""
 clients = []
+positionVisited = []
 connected_ips = set()
 baseIP = "192.168.98."
 table_data = [
@@ -163,16 +164,32 @@ def a_star_search(mapa, start, goal):
 
 def search_best_zone(position,mapa):
     cost = 10000
-    path = ()
+    nextStep = ()
     for neighbor in get_neighbors(position):
             #neighbor = (current[0] + dx, current[1] + dy)
             if neighbor in mapa:
-                new_cost = mapa[neighbor]
-                if new_cost < cost:
-                    cost = new_cost
-                    path = neighbor
-                    
-    return path
+                if neighbor not in positionVisited:
+                    new_cost = mapa[neighbor]
+                    if new_cost < cost:
+                        cost = new_cost
+                        nextStep = neighbor
+
+    positionVisited.append(nextStep)
+    
+    if sensor_values[nextStep] >= 50:
+        print("Perigo")
+        cost = 1000
+        new_coord = ()
+        for coord in positionVisited:
+            new_cost = full_sensor_data[coord]
+            if new_cost < cost:
+                cost = new_cost
+                new_coord = coord
+        new_path = a_star_search(map,position,new_coord)
+        if new_path:
+            nextStep = new_path[1]
+
+    return nextStep
 
     
     
