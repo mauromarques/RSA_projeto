@@ -114,11 +114,7 @@ def connect_client(ip):
     clients.append(client)
     connected_ips.add(ip)
 
-def a_star_search(mapa, start, goal):
-    def heuristic(a, b):
-        return abs(a[0] - b[0]) + abs(a[1] - b[1])
-    
-    def get_neighbors(position):
+def get_neighbors(position):
         x, y = position
         neighbors = [
             (x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1),
@@ -127,6 +123,10 @@ def a_star_search(mapa, start, goal):
         # Filter out neighbors that are out of bounds or unsafe
         #neighbors = [(nx, ny) for nx, ny in neighbors if 0 <= nx < len(map) and 0 <= ny < len(map[0]) and map[nx][ny] == 0]
         return neighbors
+
+def a_star_search(mapa, start, goal):
+    def heuristic(a, b):
+        return abs(a[0] - b[0]) + abs(a[1] - b[1])
     
     open_set = []
     heapq.heappush(open_set, (0, start))
@@ -161,8 +161,24 @@ def a_star_search(mapa, start, goal):
 
     return path
 
+def search_best_zone(position,mapa):
+    cost = 10000
+    path = ()
+    for neighbor in get_neighbors(position):
+            #neighbor = (current[0] + dx, current[1] + dy)
+            if neighbor in mapa:
+                new_cost = mapa[neighbor]
+                if new_cost < cost:
+                    cost = new_cost
+                    path = neighbor
+                    
+    return path
+
+    
+    
+
 def next_step(current_position, mapa):
-    global objective, action
+    global objective, action,sensor_values
     #print("next step action: " + str(action))
     if action == NodeAction.MOVING_TOWARDS_SAFETY or action == NodeAction.MOVING_OUT_OF_DANGER: # Node has a better objective and is trying to reach it
         #print("MOVING: " + str(current_position) + " " + str(objective) + " " + str(sensor_values[current_position]) + " " + str(sensor_values[objective]))
@@ -172,7 +188,11 @@ def next_step(current_position, mapa):
         else:
             return current_position
     if action == NodeAction.SEARCHING_FOR_SAFETY: # Node has no better objective and is looking by itself
-        return current_position
+        
+        if sensor_values[current_position] >= 0 and sensor_values[current_position] < 30: #Seguro
+            return current_position
+        else: #Incerto to perigoso 
+            return search_best_zone(current_position,mapa)
     if action == NodeAction.STATIONED: # Node has reached safety
         return current_position
     
@@ -211,6 +231,7 @@ def update_sensor_values_within_radius():
     if count > 0:
         average_value = total_value / count
         sensor_values[currentPosition] = average_value
+    #print(sensor_values[currentPosition])
 
 def find_connected_nodes(current_position, station_locations, radius):
     visited = set()
