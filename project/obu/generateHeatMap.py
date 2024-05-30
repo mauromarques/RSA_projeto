@@ -141,8 +141,8 @@ otherCoordinates = []
 sensor_data = read_sensor_data(sensor_data_file)
 
 # Plot heat map
-background_image = plt.imread('map.webp')
-opacity = 0.6
+background_image = plt.imread('map.png')
+opacity = 0.85
 fig, ax = plot_heat_map(sensor_data, "Heat Map", background_image, opacity)
 
 # Base IP address

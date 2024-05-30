@@ -26,8 +26,6 @@ sensorMap = {}
 station_locations = {}
 listening_ip = ""
 clients = []
-range_of_Map = ()
-positionVisited = []
 connected_ips = set()
 baseIP = "192.168.98."
 table_data = [
@@ -86,8 +84,6 @@ def on_message(client, userdata, msg):
 
     if station_id not in connected_nodes:
         update_table_status(station_id, "MISSING")
-        if msg.topic == "vanetza/out/cam":
-            client.publish("simulation/location_update", json.dumps(obj))
         return
     
     update_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -118,20 +114,19 @@ def connect_client(ip):
     clients.append(client)
     connected_ips.add(ip)
 
-def get_neighbors(position):
-        global range_of_Map
+def a_star_search(mapa, start, goal):
+    def heuristic(a, b):
+        return abs(a[0] - b[0]) + abs(a[1] - b[1])
+    
+    def get_neighbors(position):
         x, y = position
         neighbors = [
             (x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1),
             (x + 1, y + 1), (x - 1, y + 1), (x + 1, y - 1), (x - 1, y - 1)
         ]
         # Filter out neighbors that are out of bounds or unsafe
-        neighbors = [(nx, ny) for nx, ny in neighbors if range_of_Map[0] <= nx <= range_of_Map[1] and  range_of_Map[0]  <= ny <= range_of_Map[1]]
+        #neighbors = [(nx, ny) for nx, ny in neighbors if 0 <= nx < len(map) and 0 <= ny < len(map[0]) and map[nx][ny] == 0]
         return neighbors
-
-def a_star_search(mapa, start, goal):
-    def heuristic(a, b):
-        return abs(a[0] - b[0]) + abs(a[1] - b[1])
     
     open_set = []
     heapq.heappush(open_set, (0, start))
@@ -166,39 +161,27 @@ def a_star_search(mapa, start, goal):
 
     return path
 
-def search_best_zone(position,mapa):
-    cost = 10000
-    nextStep = position
-    for neighbor in get_neighbors(position):
-            #neighbor = (current[0] + dx, current[1] + dy)
-            if neighbor in mapa:
-                if neighbor not in positionVisited:
-                    new_cost = mapa[neighbor]
-                    if new_cost < cost:
-                        cost = new_cost
-                        nextStep = neighbor
+def get_lowest_reading_in_radius(sensorMap, current_location, radius=5):
+    current_x, current_y = current_location
+    lowest_reading = float('inf')
+    lowest_coordinates = None
 
-
-    if nextStep:
-        if sensorMap[nextStep] >= 80  and positionVisited:
-            cost = 1000
-            new_coord = ()
-            for coord in positionVisited:
-                new_cost = full_sensor_data[coord]
-                if new_cost < cost:
-                    cost = new_cost
-                    new_coord = coord
-            new_path = a_star_search(mapa,position,new_coord)
-            if new_path:
-                nextStep = new_path[1]
-
-    return nextStep
-
+    for (x, y), reading in sensorMap.items():
+        # Calculate the distance from the current location
+        distance = math.sqrt((x - current_x)**2 + (y - current_y)**2)
+        
+        # Check if the distance is within the specified radius
+        if distance <= radius:
+            # Check if this reading is the lowest we've found
+            if reading < lowest_reading:
+                lowest_reading = reading
+                lowest_coordinates = (x, y)
     
-    
+    return lowest_coordinates
 
 def next_step(current_position, mapa):
-    global objective, action,sensor_values, positionVisited
+    global objective, action, sensorMap
+    #print("next step action: " + str(action))
     if action == NodeAction.MOVING_TOWARDS_SAFETY or action == NodeAction.MOVING_OUT_OF_DANGER: # Node has a better objective and is trying to reach it
         path = a_star_search(mapa, current_position, objective)
         if path:
@@ -206,10 +189,12 @@ def next_step(current_position, mapa):
         else:
             return current_position
     if action == NodeAction.SEARCHING_FOR_SAFETY: # Node has no better objective and is looking by itself
-            nextStep = search_best_zone(current_position,mapa)
-            positionVisited.append(nextStep)
-            return nextStep
-        
+        nextPlaceToExplore = get_lowest_reading_in_radius(sensorMap, current_position)
+        path = a_star_search(mapa, current_position, nextPlaceToExplore)
+        if path:
+            return path[1]  # Retorna o próximo passo na rota   
+        else:
+            return current_position
     if action == NodeAction.STATIONED: # Node has reached safety
         return current_position
     
@@ -224,19 +209,12 @@ def find_lowest_value_position():
 
 
 def read_sensor_data():
-    global full_sensor_data,range_of_Map
-    mini = 0
-    max = 0
+    global full_sensor_data
     full_sensor_data = {}
     with open('sensor_data.txt', 'r') as f:
         for line in f:
             x, y, value = map(float, line.strip().split(','))
             full_sensor_data[(x, y)] = value
-            if x < mini:
-                mini = x
-            if x > max:
-                max = x
-    range_of_Map = (mini,max)
 
 def update_sensor_values_within_radius():
     global sensor_values, currentPosition, sensorMap, full_sensor_data
@@ -290,6 +268,7 @@ def generateCam():
     m["latitude"] = lat
     m["longitude"] = lon
     m["stationID"] = int(int(listening_ip) / 10)
+    print(json.dumps(m))
     client.publish("vanetza/in/cam", json.dumps(m))
     client.publish("simulation/location_update", json.dumps(m))
 
@@ -329,21 +308,25 @@ def generateActionReport():
 
 def send_locationEvaluation():
     while True:
+        print("evaluation")
         generateLocationEvaluation()
         sleep(1)
 
 def send_cam():
     while True:
+        print("cam")
         generateCam()
         sleep(1)
 
 def send_actionReport():
     while True:
+        print("action report")
         generateActionReport()
         sleep(2)
 
 def print_table_periodically():
     while True:
+        print("table")
         update_table()
         print("\033[H\033[J", end="")  # Clear screen
         print_table()
@@ -351,6 +334,7 @@ def print_table_periodically():
 
 def updateAction():
     while True:
+        print("action")
         newAction()
         sleep(0.5)
 
@@ -359,7 +343,7 @@ def newAction():
     update_sensor_values_within_radius()
     safestPlaceKnown, safestPlaceEvaluation = find_lowest_value_position()
     # FOUND SAFE SPOT, IS NOT AT SAFE SPOT -> move there
-    if safestPlaceEvaluation <= 29 and safestPlaceKnown != currentPosition and sensor_values[currentPosition] < 80:
+    if safestPlaceEvaluation <= 29 and safestPlaceKnown != currentPosition:
         action = NodeAction.MOVING_TOWARDS_SAFETY
         objective = safestPlaceKnown
     # FOUND SAFE SPOT, IS AT SAFE SPOT -> stay still
@@ -400,4 +384,4 @@ threading.Thread(target=send_actionReport).start()
 threading.Thread(target=updateAction).start()
 
 # Start the thread for printing the table periodically
-threading.Thread(target=print_table_periodically).start()
+# threading.Thread(target=print_table_periodically).start()

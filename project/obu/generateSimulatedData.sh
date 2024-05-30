@@ -3,7 +3,7 @@
 # Define variables
 OBU_TO_OBSERVE=20
 NUM_HEAT_POINTS=6
-GRID_DIMENSION=100
+GRID_DIMENSION=90
 SENSOR_MAX_VALUE=100
 SENSOR_VARIATION_RANGE=2
 
@@ -18,3 +18,5 @@ python3 generateHeatMap.py sensor_data.txt $OBU_TO_OBSERVE
 echo "------------------------------------"
 
 echo "All scripts executed."
+
+
