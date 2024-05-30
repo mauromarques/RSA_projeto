@@ -26,6 +26,7 @@ sensorMap = {}
 station_locations = {}
 listening_ip = ""
 clients = []
+range_of_Map = ()
 positionVisited = []
 connected_ips = set()
 baseIP = "192.168.98."
@@ -116,13 +117,14 @@ def connect_client(ip):
     connected_ips.add(ip)
 
 def get_neighbors(position):
+        global range_of_Map
         x, y = position
         neighbors = [
             (x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1),
             (x + 1, y + 1), (x - 1, y + 1), (x + 1, y - 1), (x - 1, y - 1)
         ]
         # Filter out neighbors that are out of bounds or unsafe
-        #neighbors = [(nx, ny) for nx, ny in neighbors if 0 <= nx < len(map) and 0 <= ny < len(map[0]) and map[nx][ny] == 0]
+        neighbors = [(nx, ny) for nx, ny in neighbors if range_of_Map[0] <= nx <= range_of_Map[1] and  range_of_Map[0]  <= ny <= range_of_Map[1]]
         return neighbors
 
 def a_star_search(mapa, start, goal):
@@ -174,20 +176,20 @@ def search_best_zone(position,mapa):
                         cost = new_cost
                         nextStep = neighbor
 
-    positionVisited.append(nextStep)
-    
-    if sensor_values[nextStep] >= 50:
-        print("Perigo")
-        cost = 1000
-        new_coord = ()
-        for coord in positionVisited:
-            new_cost = full_sensor_data[coord]
-            if new_cost < cost:
-                cost = new_cost
-                new_coord = coord
-        new_path = a_star_search(map,position,new_coord)
-        if new_path:
-            nextStep = new_path[1]
+
+    if nextStep:
+        if sensorMap[nextStep] >= 80  and positionVisited:
+            print("Perigo")
+            cost = 1000
+            new_coord = ()
+            for coord in positionVisited:
+                new_cost = full_sensor_data[coord]
+                if new_cost < cost:
+                    cost = new_cost
+                    new_coord = coord
+            new_path = a_star_search(map,position,new_coord)
+            if new_path:
+                nextStep = new_path[1]
 
     return nextStep
 
@@ -209,7 +211,11 @@ def next_step(current_position, mapa):
         if sensor_values[current_position] >= 0 and sensor_values[current_position] < 30: #Seguro
             return current_position
         else: #Incerto to perigoso 
-            return search_best_zone(current_position,mapa)
+            nextStep = search_best_zone(current_position,mapa)
+            positionVisited.append(nextStep)
+
+            return nextStep
+        
     if action == NodeAction.STATIONED: # Node has reached safety
         return current_position
     
@@ -224,12 +230,19 @@ def find_lowest_value_position():
 
 
 def read_sensor_data():
-    global full_sensor_data
+    global full_sensor_data,range_of_Map
+    mini = 0
+    max = 0
     full_sensor_data = {}
     with open('sensor_data.txt', 'r') as f:
         for line in f:
             x, y, value = map(float, line.strip().split(','))
             full_sensor_data[(x, y)] = value
+            if x < mini:
+                mini = x
+            if x > max:
+                max = x
+    range_of_Map = (mini,max)
 
 def update_sensor_values_within_radius():
     global sensor_values, currentPosition, sensorMap, full_sensor_data
