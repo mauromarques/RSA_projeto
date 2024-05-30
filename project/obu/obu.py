@@ -187,7 +187,7 @@ def search_best_zone(position,mapa):
                 if new_cost < cost:
                     cost = new_cost
                     new_coord = coord
-            new_path = a_star_search(map,position,new_coord)
+            new_path = a_star_search(mapa,position,new_coord)
             if new_path:
                 nextStep = new_path[1]
 
